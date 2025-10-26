@@ -1,0 +1,374 @@
+from flask import Flask, render_template, request, redirect, url_for, session, flash
+import mysql.connector
+
+# Conexión a la base de datos
+conexio=mysql.connector.connect(
+    user='jaumetdr',
+    password='jaume_arnau_tdr',
+    host='192.168.18.141',
+    database='tdrjc',
+    port=3306,
+    use_pure=True)
+
+app=Flask(__name__)
+app.secret_key="Jaume"
+
+@app.route("/")
+def pantalla_carrega():
+    return render_template("pantalla_carrega.html")
+
+@app.route("/pantalla_inici")
+def pantalla_inici():
+    camps = session.get("camps", [])
+    return render_template("pantalla_inici.html", camps=camps)
+
+@app.route("/inici_sessio")
+def inici_sessio():
+    return render_template("inici_sessio.html")
+
+@app.route("/registrarse")
+def registrarse(): 
+    return render_template("registrarse.html")
+
+@app.route("/camp0")
+def camp0():
+    return render_template("camp0.html")
+
+@app.route("/camp1")
+def camp1():
+    return render_template("camp1.html")
+
+@app.route("/camp2") 
+def camp2(): 
+    return render_template("camp2.html")
+
+@app.route("/camp3")
+def camp3():
+    return render_template("camp3.html")
+
+@app.route("/camp4")
+def camp4():
+    return render_template("camp4.html")
+
+@app.route("/afegir")
+def afegir():
+    return render_template("afegir_camp.html")
+
+@app.route("/emergent")
+def emergent():
+    return render_template("emergent_camp.html")
+
+@app.route("/editable")
+def editable(): 
+    camps = session.get("camps", [])
+    return render_template("editable.html", camps=camps)
+
+@app.route("/emergent_editable", methods=["POST"])
+def emergent_editable():
+    camp_seleccionat = request.form.get("camp")
+    session["camp_seleccionat"] = camp_seleccionat
+    return render_template("emergent_editable.html")
+
+def mostrar_camps(userid):
+    cursor=conexio.cursor(dictionary=True, buffered=True)
+    cursor.execute("""
+        SELECT camps.nomcamp
+        FROM usuaris_camps
+        JOIN camps ON usuaris_camps.camps_id = camps.camps_id
+        WHERE usuaris_camps.userid = %s
+    """, (userid,))
+    resultats=cursor.fetchall()
+    cursor.close()
+
+    llista_camps=[r['nomcamp'] for r in resultats]
+    session["camps"]=llista_camps[:5]
+
+    return redirect(url_for("pantalla_inici"))
+
+@app.route("/cuadres", methods=["POST"])
+def cuadres():
+    nom=request.form["Nom"]
+    cognom=request.form["Cognoms"]
+    email=request.form["EMail"]
+    contra=request.form["Contrasenya"]
+    conf_contra=request.form["Confirmar contrasenya"]
+    respostan=""
+    respostac=""
+    respostae=""
+    respostacontra=""
+    respostaccontra=""
+    respostacoinc=""
+
+    if nom=="":
+        respostan="Escriu el teu Nom"
+    if cognom=="":
+        respostac="Escriu els teus Cognoms"
+    if email=="":
+        respostae="Escriu el teu Email"
+    if contra=="":
+        respostacontra="Escriu la teva contrasenya"
+    if conf_contra=="":
+        respostaccontra="Escriu la teva contrasenya una altra vegada"
+    if contra!="" and conf_contra!="" and contra!=conf_contra:
+        contra=""
+        conf_contra=""
+        respostacoinc="La contrasenya no coincideix"
+
+    if respostan=="" and respostac=="" and respostae=="" and respostacontra=="" and respostaccontra=="" and respostacoinc=="":
+        cursor=conexio.cursor(dictionary=True, buffered=True)
+        cursor.execute("""
+            INSERT INTO usuaris_app (nom, cognom, email, contrasenya) 
+            VALUES (%s, %s, %s, %s)
+        """, (nom, cognom, email, contra))
+        conexio.commit()
+        cursor.close()
+
+    return render_template("registrarse.html", conf_contra=conf_contra, contra=contra, email=email, cognom=cognom, nom=nom, respostan=respostan, respostac=respostac, respostae=respostae, respostaccontra=respostaccontra, respostacontra=respostacontra, respostacoinc=respostacoinc)
+
+@app.route("/cuadres_edit", methods=["POST"])
+def cuadres_edit():
+    nom=request.form["Nom"]
+    cognom=request.form["Cognoms"]
+    email=request.form["EMail"]
+    contra=request.form["Contrasenya"]
+    conf_contra=request.form["Confirmar contrasenya"]
+    respostan=""
+    respostac=""
+    respostae=""
+    respostacontra=""
+    respostaccontra=""
+    respostacoinc=""
+
+    if nom=="":
+        respostan="Escriu el Nom"
+    if cognom=="":
+        respostac="Escriu els Cognoms"
+    if email=="":
+        respostae="Escriu el Email"
+    if contra=="":
+        respostacontra="Escriu la contrasenya"
+    if conf_contra=="":
+        respostaccontra="Escriu la contrasenya una altra vegada"
+    if contra!="" and conf_contra!="" and contra!=conf_contra:
+        contra=""
+        conf_contra=""
+        respostacoinc="La contrasenya no coincideix"
+
+    if respostan=="" and respostac=="" and respostae=="" and respostacontra=="" and respostaccontra=="" and respostacoinc=="":
+        cursor=conexio.cursor(dictionary=True, buffered=True)
+        usuari_id = session.get("user_id")
+        if not usuari_id:
+            return redirect(url_for("inici_sessio"))
+        noves_dades=[nom, cognom, email, contra, usuari_id]
+        if conexio.is_connected():
+            cursor = conexio.cursor()
+
+        cursor.execute("""
+            UPDATE usuaris_app 
+            SET nom = %s, cognom = %s, email = %s, contrasenya = %s
+            WHERE userid = %s
+        """, noves_dades)
+
+        if cursor.rowcount == 1:
+            conexio.commit()
+
+        else:
+            conexio.rollback()
+
+
+        cursor.close()
+        conexio.close()
+
+
+    return render_template("registre_editar.html", conf_contra=conf_contra, contra=contra, email=email, cognom=cognom, nom=nom, respostan=respostan, respostac=respostac, respostae=respostae, respostaccontra=respostaccontra, respostacontra=respostacontra, respostacoinc=respostacoinc)
+
+@app.route("/inici", methods=["POST"])
+def iniciar_sessio():
+    iemail = request.form.get("EMail")
+    icontrasenya = request.form.get("Contrasenya")
+    irespostac=""
+    irespostae=""
+
+    if iemail=="":
+        irespostae="Escriu el teu Email"
+    
+    if icontrasenya=="":
+        irespostac="Escriu la teva contrasenya"
+
+    if irespostac=="" and irespostae=="":
+        cursor = conexio.cursor(dictionary=True, buffered=True)
+        cursor.execute("""
+            SELECT userid, email, contrasenya
+            FROM usuaris_app
+            WHERE email = %s AND contrasenya = %s
+        """, (iemail, icontrasenya))
+        usuari=cursor.fetchone()
+        cursor.close()
+
+        if usuari:
+            session["user_id"] = usuari["userid"]
+            session["user_email"] = usuari["email"]
+            return mostrar_camps(usuari["userid"])
+
+    return render_template("inici_sessio.html", icontrasenya=icontrasenya, iemail=iemail, irespostac=irespostac, irespostae=irespostae)
+
+@app.route("/camps", methods=["POST"])
+def camps():
+    cnom = request.form.get("Nom")
+    ctamany = request.form.get("Tamany")
+    crespostan=""
+    crespostat=""
+    usuari_id = session.get("user_id")
+    if not usuari_id:
+        return redirect(url_for("inici_sessio"))
+
+    if cnom=="":
+        crespostan="Escriu el Nom del camp"
+    
+    if ctamany=="":
+        crespostat="Tamany del camp en he"
+    else:
+        try:
+            valor = float(ctamany)
+            if valor <= 0:
+                crespostat = "El tamany ha de ser positiu"
+        except ValueError:
+            crespostat = "El tamany ha de ser un número"
+
+    if crespostan=="" and crespostat=="":
+        try:
+            cursor=conexio.cursor(dictionary=True, buffered=True)
+            cursor.execute("""
+                INSERT INTO camps (nomcamp, tamany)
+                VALUES (%s, %s)
+            """, (cnom, ctamany))
+            conexio.commit()
+            camps_id=cursor.lastrowid
+            cursor.execute("""
+                INSERT INTO usuaris_camps (userid, camps_id)
+                VALUES (%s, %s)
+            """, (usuari_id, camps_id))
+            conexio.commit()
+            cursor.close()
+            return mostrar_camps(usuari_id)
+        except mysql.connector.IntegrityError:
+            crespostan="Ja existeix aquest nom"
+
+    return render_template("emergent_camp.html", cnom=cnom, ctamany=ctamany, crespostan=crespostan, crespostat=crespostat)
+
+#ESTEM TREBALLANT AQUI
+@app.route("/camps_edit", methods=["POST"])
+def camps_edit():
+    cnom = request.form.get("Nom")
+    ctamany = request.form.get("Tamany")
+    crespostan=""
+    crespostat=""
+    nom_camp = session.get("camp_seleccionat")
+    usuari_id = session.get("user_id")
+    if not usuari_id:
+        return redirect(url_for("inici_sessio"))
+
+    if cnom=="":
+        crespostan="Escriu el nou Nom del camp"
+    
+    if ctamany=="":
+        crespostat="nou Tamany del camp en he"
+    else:
+        try:
+            valor = float(ctamany)
+            if valor <= 0:
+                crespostat = "El tamany ha de ser positiu"
+        except ValueError:
+            crespostat = "El tamany ha de ser un número"
+
+    if crespostan=="" and crespostat=="":
+        try:
+            data = (cnom, ctamany, nom_camp)
+
+
+            if conexio.is_connected():
+                cursor=conexio.cursor(dictionary=True, buffered=True)
+
+            cursor.execute("""
+                UPDATE camps 
+                SET nomcamp = %s, tamany = %s
+                WHERE nomcamp = %s
+            """, data)
+
+            if cursor.rowcount == 1:
+                conexio.commit()
+
+            else:
+                conexio.rollback()
+
+
+            cursor.close()
+            return mostrar_camps(usuari_id)
+        except mysql.connector.IntegrityError:
+            crespostan="Ja existeix aquest nom"
+
+    return render_template("emergent_editable.html", cnom=cnom, ctamany=ctamany, crespostan=crespostan, crespostat=crespostat)
+
+
+@app.route("/notificacio")
+def notificacio():
+    flash("Missatge temporal, AAAAAAAAAAAAAAAAAAAAA!", "success")
+    return redirect(url_for("pantalla_inici"))
+
+@app.route("/registre_editar")
+def registre_editar():
+    return render_template("registre_editar.html")
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@app.route("/inici", methods=["POST"])
+def iniciar_sessio():
+    iemail = request.form.get("EMail")
+    icontrasenya = request.form.get("Contrasenya")
+    irespostac=""
+    irespostae=""
+
+    if iemail=="":
+        irespostae="Escriu el teu Email"
+    
+    if icontrasenya=="":
+        irespostac="Escriu la teva contrasenya"
+
+    if irespostac=="" and irespostae=="":
+        cursor = conexio.cursor(dictionary=True, buffered=True)
+        cursor.execute("""
+            SELECT userid, email, contrasenya
+            FROM usuaris_app
+            WHERE email = %s AND contrasenya = %s
+        """, (iemail, icontrasenya))
+        usuari=cursor.fetchone()
+        cursor.close()
+
+        if usuari:
+            session["user_id"] = usuari["userid"]
+            session["user_email"] = usuari["email"]
+            return mostrar_camps(usuari["userid"])
+
+    return render_template("inici_sessio.html", icontrasenya=icontrasenya, iemail=iemail, irespostac=irespostac, irespostae=irespostae)
